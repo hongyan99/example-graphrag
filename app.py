@@ -4,11 +4,9 @@ from cdlib import algorithms
 import os
 from dotenv import load_dotenv
 from constants import DOCUMENTS
+from config import llm_adapter
 
 load_dotenv()
-
-
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # 1. Source Documents → Text Chunks
@@ -26,16 +24,11 @@ def extract_elements_from_chunks(chunks):
     elements = []
     for index, chunk in enumerate(chunks):
         print(f"Chunk index {index} of {len(chunks)}:")
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Extract entities and relationships from the following text."},
-                {"role": "user", "content": chunk}
-            ]
+        result = llm_adapter.generate_text(
+            system_message="Extract entities and relationships from the following text.",
+            user_message=chunk
         )
-        print(response.choices[0].message.content)
-        entities_and_relations = response.choices[0].message.content
-        elements.append(entities_and_relations)
+        elements.append(result)
     return elements
 
 
@@ -44,16 +37,12 @@ def summarize_elements(elements):
     summaries = []
     for index, element in enumerate(elements):
         print(f"Element index {index} of {len(elements)}:")
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Summarize the following entities and relationships in a structured format. Use \"->\" to represent relationships, after the \"Relationships:\" word."},
-                {"role": "user", "content": element}
-            ]
+        result = llm_adapter.generate_text(
+            system_message="Summarize the following entities and relationships in a structured format. Use \"->\" to represent relationships, after the \"Relationships:\" word.",
+            user_message=element
         )
-        print("Element summary:", response.choices[0].message.content)
-        summary = response.choices[0].message.content
-        summaries.append(summary)
+        print("Element summary:", result)
+        summaries.append(result)
     return summaries
 
 
@@ -127,16 +116,11 @@ def summarize_communities(communities, graph):
             relationships.append(
                 f"{edge[0]} -> {edge[2]['label']} -> {edge[1]}")
         description += ", ".join(relationships)
-
-        response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[
-                {"role": "system", "content": "Summarize the following community of entities and relationships."},
-                {"role": "user", "content": description}
-            ]
+        result = llm_adapter.generate_text(
+            system_message="Summarize the following community of entities and relationships.",
+            user_message=description
         )
-        summary = response.choices[0].message.content.strip()
-        community_summaries.append(summary)
+        community_summaries.append(result)
     return community_summaries
 
 
@@ -145,26 +129,17 @@ def generate_answers_from_communities(community_summaries, query):
     intermediate_answers = []
     for index, summary in enumerate(community_summaries):
         print(f"Summary index {index} of {len(community_summaries)}:")
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Answer the following query based on the provided summary."},
-                {"role": "user", "content": f"Query: {query} Summary: {summary}"}
-            ]
+        result = llm_adapter.generate_text(
+            system_message="Generate an answer based on the following summary.",
+            user_message=f"Query: {query} Summary: {summary}"
         )
-        print("Intermediate answer:", response.choices[0].message.content)
-        intermediate_answers.append(
-            response.choices[0].message.content)
+        print("Intermediate answer:", result)
+        intermediate_answers.append(result)
 
-    final_response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {"role": "system",
-                "content": "Combine these answers into a final, concise response."},
-            {"role": "user", "content": f"Intermediate answers: {intermediate_answers}"}
-        ]
+    final_answer = llm_adapter.generate_text(
+        system_message="Combine these answers into a final, concise response.",
+        user_message=f"Intermediate answers: {intermediate_answers}"
     )
-    final_answer = final_response.choices[0].message.content
     return final_answer
 
 
